@@ -1,1 +1,14 @@
+## User stories/roles (e.g., administrator, customer), use cases, and requirements: Define
+scenario, actions, key requirements, and key functions for each role that you would like in
+your system.
+## Keep a prioritized backlog: e.g. a list of identified functions that will go into current and
+future sprints. As soon as you identify the need for a new function or item of development,
+add it to the backlog. Each item should have ID, description, priority (importance), effort
+(small, medium, large), sprint no (when assigned), and status.
 
+## Small Sprints: Make small development cycles, producing demos (e.g., every other week),
+each one adding a small set of functions as identified above. If time is short, drop functions
+and finish in time.
+## Test-driven: define test cases early. They should be saved and reused over and over.
+##  Get ready for the sprint review with your supervisor (lab assistants). You should be able to
+present demo and documentation (see below) and have a plan for the next sprint
