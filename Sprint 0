@@ -12,3 +12,18 @@ and finish in time.
 ## Test-driven: define test cases early. They should be saved and reused over and over.
 ##  Get ready for the sprint review with your supervisor (lab assistants). You should be able to
 present demo and documentation (see below) and have a plan for the next sprint
+
+
+The assignment requires us to develop a small e-commerce website that interacts with an SQL database and is accessible via a standard web browser. Our task includes setting up and managing the database on a server while building a basic web frontend. The database schema will be designed to store and manage the data used by the website.
+In the first week, we focused on setting up the AWS machines, selecting our e-commerce model, and choosing the programming language and IDE. We decided to use Python Flask as our language and VSCode as our IDE.
+For the e-commerce model, we chose a bookstore. The system will have two primary roles:
+Administrator (Admin): Manages inventory and customer interactions.
+Customer: Browses and purchases books.
+The goal of our project is to provide an online platform where customers can buy books. To guide our development process, we established a few user stories:
+User Stories:
+S1: Browsing the bookstore – As a customer, I want to see the store’s products and read their details so that I can decide whether to purchase them.
+S2: Admin system overview – As an administrator, I want to log in and view the system's inventory so that I can manage and update it as needed.
+S3: Customer account management – As a customer, I want to create and access my account so that my preferences are stored.
+S4: Shopping basket – As a customer, I want to add products to my shopping basket so that I can proceed to checkout.
+S5: Checkout and payment – As a customer, I want to complete my purchase and make a payment so that I can receive my order.
+These stories do not follow a strict order and may evolve over time. Some can be expanded or divided into multiple stories as needed. They serve as a guide to help us define the necessary functionalities and determine where to begin development.
