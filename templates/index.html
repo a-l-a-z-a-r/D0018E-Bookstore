@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookstore</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Bookstore</h1>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/cart">Cart</a>
+        </nav>
+    </header>
+    <main>
+        <section class="book-list">
+            {% for book in books %}
+            <div class="book-card">
+                <img src="/static/images/{{ book.image }}" alt="{{ book.title }}">
+                <h2>{{ book.title }}</h2>
+                <p><strong>Author:</strong> {{ book.author }}</p>
+                <p><strong>Price:</strong> ${{ book.price }}</p>
+                <a href="/add_to_cart/{{ book.id }}" class="button">Add to Cart</a>
+            </div>
+            {% endfor %}
+        </section>
+    </main>
+</body>
+</html>
