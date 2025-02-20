@@ -88,8 +88,8 @@ def cart():
 @app.route('/add_to_cart/<int:book_id>')
 def add_to_cart(book_id):
     if 'user_id' not in session:
-        flash("You need to log in first.")
-        return redirect(url_for('login'))
+        flash("You need to log in first to buy books.")
+        return redirect(url_for('need_login'))
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -100,6 +100,10 @@ def add_to_cart(book_id):
     
     flash("Book added to the cart!")
     return redirect(url_for('cart'))
+
+@app.route('/need_login')
+def need_login():
+    return render_template('need_login.html', username=session.get('username'))
 
 @app.route('/remove_from_cart/<int:book_id>')
 def remove_from_cart(book_id):
