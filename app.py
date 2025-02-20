@@ -24,6 +24,7 @@ def home():
     books = cursor.fetchall()
     cursor.close()
     conn.close()
+    
     return render_template('index.html', books=books, username=session.get('username'))
 
 @app.route('/book/<int:book_id>')
@@ -36,6 +37,19 @@ def book_detail(book_id):
     conn.close()
     if book:
         return render_template('book_detail.html', book=book, username=session.get('username'))
+    return "Book not found", 404
+
+
+@app.route('/book/<int:book_id>')
+def book_detail(book_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
+    book = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if book:
+        return render_template('book_detail.html', book=book)
     return "Book not found", 404
 
 @app.route('/cart')
@@ -126,6 +140,28 @@ def register():
             conn.close()
 
     return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if user:
+            session['user_id'] = user['id']
+            flash("Login successful!")
+            return redirect(url_for('home'))
+        else:
+            flash("Invalid credentials.")
+    
+    return render_template('login.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -7,7 +7,7 @@ body {
 }
 
 header {
-    background-color: #0073e6;
+    background-color: #3a5d88;
     color: white;
     padding: 20px;
     text-align: center;
@@ -21,6 +21,7 @@ header nav a {
 
 main {
     padding: 20px;
+    text-align: center;
 }
 
 .book-list {
@@ -38,14 +39,16 @@ main {
 }
 
 .book-card img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-}
+    width: 200px;         /* Desired width */
+    height: 300px;        /* Desired height */
+    object-fit: cover;    /* Crop the image if necessary to fill the area */
+    display: block;       /* Ensures no extra spacing from inline elements */
+  }
+  
 
 .button {
     display: inline-block;
-    background-color: #0073e6;
+    background-color: #3a5d88;
     color: white;
     text-decoration: none;
     padding: 10px 15px;
@@ -76,3 +79,15 @@ main {
     padding: 10px;
     border-radius: 5px;
 }
+
+a {
+  color: #4192e8;        /* Default link color */
+  text-decoration: none; /* No underline */
+  transition: color 0.3s;
+}
+
+a:hover {
+  color: #0056b3;        /* Hover color */
+  text-decoration: underline; /* Show underline on hover, if you like */
+}
+
