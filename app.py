@@ -24,6 +24,7 @@ def home():
     books = cursor.fetchall()
     cursor.close()
     conn.close()
+
     return render_template('index.html', books=books, username=session.get('username'))
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -62,6 +63,7 @@ def book_detail(book_id):
         return render_template('book_detail.html', book=book, username=session.get('username'))
     return "Book not found", 404
 
+
 @app.route('/cart')
 def cart():
     if 'user_id' not in session:
@@ -82,8 +84,17 @@ def cart():
     
     cursor.close()
     conn.close()
-    
-    return render_template('cart.html', cart=cart_items, total_price=total_price, username=session.get('username'))
+    if book:
+        return render_template('book_detail.html', book=book)
+    return "Book not found", 404
+
+@app.route('/cart')
+def cart():
+    cart = session.get('cart', [])
+
+    total_price = sum(item['price'] for item in cart)
+    return render_template('cart.html', cart=cart, total_price=total_price, username=session.get('username'))
+
 
 @app.route('/add_to_cart/<int:book_id>')
 def add_to_cart(book_id):
