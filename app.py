@@ -16,11 +16,19 @@ db_config = {
 def get_db_connection():
     return mysql.connector.connect(**db_config)
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def home():
+    search_query = request.form.get('search', '')
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM books")
+
+    if search_query:
+        cursor.execute("SELECT * FROM books WHERE title LIKE %s OR author LIKE %s", 
+                       (f"%{search_query}%", f"%{search_query}%"))
+    else:
+        cursor.execute("SELECT * FROM books")
+    
     books = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -63,52 +71,47 @@ def book_detail(book_id):
         return render_template('book_detail.html', book=book, username=session.get('username'))
     return "Book not found", 404
 
-
 @app.route('/cart')
 def cart():
     if 'user_id' not in session:
-        flash("You need to log in first.")
+        flash("You need to log in first to view your cart.")
         return redirect(url_for('login'))
-    
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
-        SELECT books.id, books.title, books.author, books.price 
+        SELECT books.id, books.title, books.price, shopping_cart.quantity 
         FROM shopping_cart 
-        JOIN books ON shopping_cart.book_id = books.id 
+        JOIN books ON shopping_cart.book_id = books.id
         WHERE shopping_cart.user_id = %s
     """, (session['user_id'],))
-    
     cart_items = cursor.fetchall()
-    total_price = sum(item['price'] for item in cart_items)
-    
     cursor.close()
     conn.close()
-    if book:
-        return render_template('book_detail.html', book=book)
-    return "Book not found", 404
 
-@app.route('/cart')
-def cart():
-    cart = session.get('cart', [])
+    total_price = sum(item['price'] * item['quantity'] for item in cart_items)
 
-    total_price = sum(item['price'] for item in cart)
-    return render_template('cart.html', cart=cart, total_price=total_price, username=session.get('username'))
+    return render_template('cart.html', cart=cart_items, total_price=total_price, username=session.get('username'))
+
 
 
 @app.route('/add_to_cart/<int:book_id>')
 def add_to_cart(book_id):
     if 'user_id' not in session:
         flash("You need to log in first to buy books.")
-        return redirect(url_for('need_login'))
-    
+        return redirect(url_for('login'))
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO shopping_cart (user_id, book_id, quantity) VALUES (%s, %s, 1) ON DUPLICATE KEY UPDATE quantity = quantity + 1", (session['user_id'], book_id))
+    cursor.execute("""
+        INSERT INTO shopping_cart (user_id, book_id, quantity) 
+        VALUES (%s, %s, 1) 
+        ON DUPLICATE KEY UPDATE quantity = quantity + 1
+    """, (session['user_id'], book_id))
     conn.commit()
     cursor.close()
     conn.close()
-    
+
     flash("Book added to the cart!")
     return redirect(url_for('cart'))
 
@@ -150,7 +153,7 @@ def checkout():
 
 @app.route('/thank_you')
 def thank_you():
-    return render_template('thank_you.html', username=session.get('username'))
+    return render_template('thankyou.html', username=session.get('username'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -168,12 +171,89 @@ def login():
         if user:
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['is_admin'] = user['is_admin']  # Store admin status
             flash("Login successful!")
-            return redirect(url_for('home'))
+            return redirect(url_for('admin_dashboard' if user['is_admin'] else 'home'))
         else:
             flash("Invalid credentials.")
     
     return render_template('login.html')
+
+
+@app.route('/admin')
+def admin_dashboard():
+    if not session.get('is_admin'):
+        flash("Access denied.")
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id, username, email FROM users")
+    users = cursor.fetchall()
+    
+    cursor.execute("SELECT * FROM books")
+    books = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template('admin.html', users=users, books=books, username=session.get('username'))
+
+
+@app.route('/admin/add_book', methods=['POST'])
+def add_book():
+    if not session.get('is_admin'):
+        flash("Access denied.")
+        return redirect(url_for('home'))
+    
+    title = request.form['title']
+    author = request.form['author']
+    price = request.form['price']
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO books (title, author, price) VALUES (%s, %s, %s)", 
+                   (title, author, price))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    flash("Book added successfully!")
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/delete_book/<int:book_id>')
+def delete_book(book_id):
+    if not session.get('is_admin'):
+        flash("Access denied.")
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM books WHERE id = %s", (book_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    flash("Book deleted successfully.")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/delete_user/<int:user_id>')
+def delete_user(user_id):
+    if not session.get('is_admin'):
+        flash("Access denied.")
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    flash("User deleted successfully.")
+    return redirect(url_for('admin_dashboard'))
+
 
 @app.route('/logout')
 def logout():
