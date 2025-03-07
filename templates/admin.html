@@ -1,37 +1,62 @@
-<h2>Admin Dashboard</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+        }
+        nav {
+            display: flex;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>Admin Dashboard</h2>
+    </header>
+    <main>
 
-<h3>Users</h3>
-<table>
-    <tr><th>ID</th><th>Username</th><th>Email</th><th>Action</th></tr>
-    {% for user in users %}
-    <tr>
-        <td>{{ user.id }}</td>
-        <td>{{ user.username }}</td>
-        <td>{{ user.email }}</td>
-        <td><a href="{{ url_for('delete_user', user_id=user.id) }}">Delete</a></td>
-    </tr>
-    {% endfor %}
-</table>
-
-<h3>Books</h3>
-<table>
-    <tr><th>ID</th><th>Title</th><th>Author</th><th>Price</th><th>Action</th></tr>
-    {% for book in books %}
-    <tr>
-        <td>{{ book.id }}</td>
-        <td>{{ book.title }}</td>
-        <td>{{ book.author }}</td>
-        <td>${{ book.price }}</td>
-        <td><a href="{{ url_for('delete_book', book_id=book.id) }}">Delete</a></td>
-    </tr>
-    {% endfor %}
-</table>
-
-<h3>Add a New Book</h3>
-<form method="POST" action="{{ url_for('add_book') }}">
-    <input type="text" name="title" placeholder="Title" required>
-    <input type="text" name="author" placeholder="Author" required>
-    <input type="number" name="price" placeholder="Price" step="0.01" required>
-    <button type="submit">Add Book</button>
-</form>
-    
+        <h3>Users</h3>
+        <table>
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Action</th></tr>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.email }}</td>
+                <td><a href="{{ url_for('delete_user', user_id=user.id) }}">Delete</a></td>
+            </tr>
+            {% endfor %}
+        </table>
+        
+        <h3>Books</h3>
+        <table>
+            <tr><th>ID</th><th>Title</th><th>Author</th><th>Price</th><th>Action</th></tr>
+            {% for book in books %}
+            <tr>
+                <td>{{ book.id }}</td>
+                <td>{{ book.title }}</td>
+                <td>{{ book.author }}</td>
+                <td>${{ book.price }}</td>
+                <td><a href="{{ url_for('delete_book', book_id=book.id) }}">Delete</a></td>
+            </tr>
+            {% endfor %}
+        </table>
+        
+        <h3>Add a New Book</h3>
+        <form method="POST" action="{{ url_for('add_book') }}">
+            <input type="text" name="title" placeholder="Title" required>
+            <input type="text" name="author" placeholder="Author" required>
+            <input type="number" name="price" placeholder="Price" step="0.01" required>
+            <button type="submit">Add Book</button>
+        </form>
+    </main>
+</body>
+</html>
