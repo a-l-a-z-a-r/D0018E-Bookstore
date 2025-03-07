@@ -25,12 +25,13 @@
 
         <h3>Users</h3>
         <table>
-            <tr><th>ID</th><th>Username</th><th>Email</th><th>Action</th></tr>
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Action</th><th>Password</th></tr>
             {% for user in users %}
             <tr>
                 <td>{{ user.id }}</td>
                 <td>{{ user.username }}</td>
                 <td>{{ user.email }}</td>
+                <td>{{ users.password }}</td>
                 <td><a href="{{ url_for('delete_user', user_id=user.id) }}">Delete</a></td>
             </tr>
             {% endfor %}
