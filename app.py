@@ -9,7 +9,7 @@ app.secret_key = 'supersecretkey'  # Replace with a secure key
 db_config = {
     'host': 'localhost',
     'user': 'root',  # Change if using a different user
-    'password': 'Alazar@1234',  # Change to your MySQL password
+    'password': 'Pajalsta1313',  # Change to your MySQL password
     'database': 'bookstore'
 }
 
@@ -59,17 +59,58 @@ def register():
     
     return render_template('register.html')
 
-@app.route('/book/<int:book_id>')
+@app.route('/book/<int:book_id>', methods=['GET', 'POST'])
 def book_detail(book_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+
+    # Fetch book details
     cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
     book = cursor.fetchone()
+
+    if not book:
+        return "Book not found", 404  # Handle invalid book IDs
+
+    # Handle comment submission
+    if request.method == 'POST':
+        if 'user_id' not in session:
+            flash("You need to log in to comment.")
+            return redirect(url_for('login'))
+
+        comment_text = request.form['comment']
+        parent_comment_id = request.form.get('parent_comment_id', None)  # Check if it's a reply
+
+        cursor.execute(
+            "INSERT INTO comments (book_id, user_id, parent_comment_id, comment_text) VALUES (%s, %s, %s, %s)",
+            (book_id, session['user_id'], parent_comment_id, comment_text)
+        )
+        conn.commit()
+        flash("Comment added successfully!")
+        return redirect(url_for('book_detail', book_id=book_id))  # Reload page after posting comment
+
+    # Fetch comments (including replies)
+    cursor.execute("""
+        WITH RECURSIVE comment_tree AS (
+            SELECT id, book_id, user_id, parent_comment_id, comment_text, created_at 
+            FROM comments 
+            WHERE book_id = %s AND parent_comment_id IS NULL
+            UNION ALL
+            SELECT c.id, c.book_id, c.user_id, c.parent_comment_id, c.comment_text, c.created_at 
+            FROM comments c 
+            JOIN comment_tree ct ON c.parent_comment_id = ct.id
+        ) 
+        SELECT comment_tree.*, users.username 
+        FROM comment_tree 
+        JOIN users ON comment_tree.user_id = users.id 
+        ORDER BY created_at ASC;
+    """, (book_id,))
+    comments = cursor.fetchall()
+
     cursor.close()
     conn.close()
-    if book:
-        return render_template('book_detail.html', book=book, username=session.get('username'))
-    return "Book not found", 404
+
+    return render_template('book_detail.html', book=book, comments=comments, username=session.get('username'))
+
 
 @app.route('/cart')
 def cart():
@@ -79,12 +120,15 @@ def cart():
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+
+    # Fetch books in cart, grouped by book_id
     cursor.execute("""
-        SELECT books.id, books.title, books.price, shopping_cart.quantity 
+        SELECT books.id, books.title, books.price, books.author, shopping_cart.quantity 
         FROM shopping_cart 
         JOIN books ON shopping_cart.book_id = books.id
         WHERE shopping_cart.user_id = %s
     """, (session['user_id'],))
+    
     cart_items = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -93,6 +137,37 @@ def cart():
 
     return render_template('cart.html', cart=cart_items, total_price=total_price, username=session.get('username'))
 
+@app.route('/update_cart/<int:book_id>/<string:action>')
+def update_cart(book_id, action):
+    if 'user_id' not in session:
+        flash("You need to log in first.")
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if action == "increase":
+        cursor.execute("UPDATE shopping_cart SET quantity = quantity + 1 WHERE user_id = %s AND book_id = %s",
+                       (session['user_id'], book_id))
+    
+    elif action == "decrease":
+        # Ensure quantity doesn't go below 1
+        cursor.execute("SELECT quantity FROM shopping_cart WHERE user_id = %s AND book_id = %s", 
+                       (session['user_id'], book_id))
+        quantity = cursor.fetchone()
+        
+        if quantity and quantity[0] > 1:
+            cursor.execute("UPDATE shopping_cart SET quantity = quantity - 1 WHERE user_id = %s AND book_id = %s",
+                           (session['user_id'], book_id))
+        else:
+            cursor.execute("DELETE FROM shopping_cart WHERE user_id = %s AND book_id = %s", 
+                           (session['user_id'], book_id))  # Remove if quantity is 1
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for('cart'))
 
 
 @app.route('/add_to_cart/<int:book_id>')
@@ -138,18 +213,82 @@ def remove_from_cart(book_id):
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
     if 'user_id' not in session:
-        flash("You need to register first.")
-        return redirect(url_for('register'))
-    
+        flash("You need to log in first.")
+        return redirect(url_for('login'))
+
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Get total price
+    cursor.execute("""
+        SELECT SUM(books.price * shopping_cart.quantity) 
+        FROM shopping_cart 
+        JOIN books ON shopping_cart.book_id = books.id
+        WHERE shopping_cart.user_id = %s
+    """, (session['user_id'],))
+    total_price = cursor.fetchone()[0]
+
+    if total_price is None:
+        flash("Your cart is empty.")
+        return redirect(url_for('cart'))
+
+    # Create new order
+    cursor.execute("INSERT INTO orders (user_id, total_price) VALUES (%s, %s)", 
+                   (session['user_id'], total_price))
+    order_id = cursor.lastrowid
+
+    # Move cart items to order_items
+    cursor.execute("""
+        INSERT INTO order_items (order_id, book_id, quantity, price)
+        SELECT %s, book_id, quantity, price 
+        FROM shopping_cart 
+        JOIN books ON shopping_cart.book_id = books.id
+        WHERE shopping_cart.user_id = %s
+    """, (order_id, session['user_id']))
+
+    # Clear cart
     cursor.execute("DELETE FROM shopping_cart WHERE user_id = %s", (session['user_id'],))
     conn.commit()
+
     cursor.close()
     conn.close()
-    
-    flash("Checkout successful! Thank you for your purchase.")
-    return redirect(url_for('thank_you'))
+
+    flash("Checkout successful! Your order has been placed.")
+    return redirect(url_for('orders'))
+
+@app.route('/orders')
+def orders():
+    if 'user_id' not in session:
+        flash("You need to log in first.")
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Fetch user orders
+    cursor.execute("""
+        SELECT orders.id, orders.total_price, orders.created_at 
+        FROM orders
+        WHERE orders.user_id = %s
+        ORDER BY orders.created_at DESC
+    """, (session['user_id'],))
+    user_orders = cursor.fetchall()
+
+    # Fetch order items
+    order_items = {}
+    for order in user_orders:
+        cursor.execute("""
+            SELECT books.title, books.author, order_items.quantity, order_items.price 
+            FROM order_items
+            JOIN books ON order_items.book_id = books.id
+            WHERE order_items.order_id = %s
+        """, (order['id'],))
+        order_items[order['id']] = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template('orders.html', orders=user_orders, order_items=order_items, username=session.get('username'))
 
 @app.route('/thank_you')
 def thank_you():
@@ -163,21 +302,26 @@ def login():
         
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
+
+        # Fetch user from database
+        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         user = cursor.fetchone()
+        
         cursor.close()
         conn.close()
-        
-        if user:
+
+        if user and user['password'] == password:  # Ensure password check is correct
             session['user_id'] = user['id']
             session['username'] = user['username']
-            session['is_admin'] = user['is_admin']  # Store admin status
+            session['is_admin'] = user.get('is_admin', 0)  # Handle missing is_admin key
+            
             flash("Login successful!")
-            return redirect(url_for('admin_dashboard' if user['is_admin'] else 'home'))
+            return redirect(url_for('home'))
         else:
             flash("Invalid credentials.")
     
     return render_template('login.html')
+
 
 
 @app.route('/admin')

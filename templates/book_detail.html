@@ -4,33 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.title }}</title>
-    <!-- Use url_for to ensure the stylesheet is correctly referenced -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <header>
         <h1>{{ book.title }}</h1>
         <nav>
-            <!-- Change these links or add more as needed -->
             <a href="{{ url_for('home') }}">Home</a>
             <a href="{{ url_for('cart') }}">Cart</a>
         </nav>
     </header>
     <main>
-        <img 
-            src="{{ url_for('static', filename='images/' ~ book.image) }}" 
-            alt="{{ book.title }}"
-            style="max-width: 300px;"
-        >
+        <img src="{{ url_for('static', filename='images/' ~ book.image) }}" alt="{{ book.title }}" style="max-width: 300px;">
         <p><strong>Author:</strong> {{ book.author }}</p>
         <p><strong>Price:</strong> ${{ book.price }}</p>
+        <p><strong>Description:</strong> {{ book.description }}</p>
 
-        <!-- Link to add the book to the cart -->
         <p>
-            <a href="{{ url_for('add_to_cart', book_id=book.id) }}" class="button">
-                Add to Cart
-            </a>
+            <a href="{{ url_for('add_to_cart', book_id=book.id) }}" class="button">Add to Cart</a>
         </p>
+
+        <!-- Comment Section -->
+        <h2>Comments</h2>
+        {% if comments %}
+            {% for comment in comments %}
+                <div class="comment" style="margin-left: {{ (comment.parent_comment_id or 0) * 20 }}px;">
+                    <strong>{{ comment.username }}</strong>: {{ comment.comment_text }}
+                    <small>{{ comment.created_at }}</small>
+
+                    <!-- Reply Form -->
+                    <form method="POST" action="{{ url_for('book_detail', book_id=book.id) }}">
+                        <input type="hidden" name="parent_comment_id" value="{{ comment.id }}">
+                        <input type="text" name="comment" placeholder="Reply to this comment..." required>
+                        <button type="submit">Reply</button>
+                    </form>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No comments yet. Be the first to comment!</p>
+        {% endif %}
+
+        <!-- Add New Comment -->
+        <h3>Add a Comment</h3>
+        {% if username %}
+            <form method="POST" action="{{ url_for('book_detail', book_id=book.id) }}">
+                <textarea name="comment" placeholder="Write your comment here..." required></textarea>
+                <button type="submit">Submit</button>
+            </form>
+        {% else %}
+            <p><a href="{{ url_for('login') }}">Login</a> to add a comment.</p>
+        {% endif %}
     </main>
 </body>
 </html>
