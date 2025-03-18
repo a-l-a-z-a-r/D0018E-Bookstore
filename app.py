@@ -3,18 +3,19 @@ import mysql.connector
 import os
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # Replace with a secure key
+app.secret_key = 'supersecretkey'  
 
 # MySQL Configuration
 db_config = {
     'host': 'localhost',
-    'user': 'root',  # Change if using a different user
-    'password': 'Pajalsta1313',  # Change to your MySQL password
+    'user': 'root',  
+    'password': 'Pajalsta1313',
     'database': 'bookstore'
 }
 
 def get_db_connection():
     return mysql.connector.connect(**db_config)
+
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -24,16 +25,141 @@ def home():
     cursor = conn.cursor(dictionary=True)
 
     if search_query:
-        cursor.execute("SELECT * FROM books WHERE title LIKE %s OR author LIKE %s", 
-                       (f"%{search_query}%", f"%{search_query}%"))
+        cursor.execute("""
+            SELECT books.*, 
+                   ROUND(AVG(ratings.rating), 1) AS avg_rating, 
+                   COUNT(ratings.rating) AS total_ratings
+            FROM books 
+            LEFT JOIN ratings ON books.id = ratings.book_id
+            WHERE books.title LIKE %s OR books.author LIKE %s
+            GROUP BY books.id
+        """, (f"%{search_query}%", f"%{search_query}%"))
     else:
-        cursor.execute("SELECT * FROM books")
+        cursor.execute("""
+            SELECT books.*, 
+                   ROUND(AVG(ratings.rating), 1) AS avg_rating, 
+                   COUNT(ratings.rating) AS total_ratings
+            FROM books 
+            LEFT JOIN ratings ON books.id = ratings.book_id
+            GROUP BY books.id
+        """)
     
     books = cursor.fetchall()
     cursor.close()
     conn.close()
 
     return render_template('index.html', books=books, username=session.get('username'))
+
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Fetch book details
+    cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
+    book = cursor.fetchone()
+
+    if not book:
+        return "Book not found", 404  # Handle invalid book IDs
+
+    # Fetch average rating
+    cursor.execute("""
+        SELECT ROUND(AVG(rating), 1) AS avg_rating, COUNT(rating) AS total_ratings
+        FROM ratings WHERE book_id = %s
+    """, (book_id,))
+    rating_data = cursor.fetchone()
+    avg_rating = rating_data['avg_rating'] if rating_data['avg_rating'] is not None else "★"
+    total_ratings = rating_data['total_ratings']
+
+    # Fetch comments (including replies)
+    cursor.execute("""
+        WITH RECURSIVE comment_tree AS (
+            SELECT id, book_id, user_id, parent_comment_id, comment_text, created_at 
+            FROM comments 
+            WHERE book_id = %s AND parent_comment_id IS NULL
+            UNION ALL
+            SELECT c.id, c.book_id, c.user_id, c.parent_comment_id, c.comment_text, c.created_at 
+            FROM comments c 
+            JOIN comment_tree ct ON c.parent_comment_id = ct.id
+        ) 
+        SELECT comment_tree.*, users.username 
+        FROM comment_tree 
+        JOIN users ON comment_tree.user_id = users.id 
+        ORDER BY created_at ASC;
+    """, (book_id,))
+    comments = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template('book_detail.html', book=book, comments=comments, avg_rating=avg_rating, total_ratings=total_ratings, username=session.get('username'))
+
+@app.route('/book/<int:book_id>', methods=['GET', 'POST'])
+def book_detail(book_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    # Fetch book details
+    cursor.execute("SELECT * FROM books WHERE id = %s", (book_id,))
+    book = cursor.fetchone()
+
+    if not book:
+        return "Book not found", 404  # Handle invalid book IDs
+
+    # Handle comment submission
+    if request.method == 'POST' and 'comment' in request.form:
+        if 'user_id' not in session:
+            flash("You need to log in to comment.")
+            return redirect(url_for('login'))
+
+        comment_text = request.form['comment']
+        parent_comment_id = request.form.get('parent_comment_id', None)
+
+        print(f"DEBUG: Adding comment - book_id: {book_id}, user_id: {session['user_id']}, parent_id: {parent_comment_id}, text: {comment_text}")
+
+        cursor.execute(
+            "INSERT INTO comments (book_id, user_id, parent_comment_id, comment_text) VALUES (%s, %s, %s, %s)",
+            (book_id, session['user_id'], parent_comment_id, comment_text)
+        )
+        conn.commit()
+        flash("Comment added successfully!")
+
+        # Reload page after posting comment
+        return redirect(url_for('book_detail', book_id=book_id))
+
+    # Fetch average rating
+    cursor.execute("""
+        SELECT ROUND(AVG(rating), 1) AS avg_rating, COUNT(rating) AS total_ratings
+        FROM ratings WHERE book_id = %s
+    """, (book_id,))
+    rating_data = cursor.fetchone()
+    avg_rating = rating_data['avg_rating'] if rating_data['avg_rating'] is not None else "★"
+    total_ratings = rating_data['total_ratings']
+
+    # Fetch comments (including replies)
+    cursor.execute("""
+        WITH RECURSIVE comment_tree AS (
+            SELECT id, book_id, user_id, parent_comment_id, comment_text, created_at 
+            FROM comments 
+            WHERE book_id = %s AND parent_comment_id IS NULL
+            UNION ALL
+            SELECT c.id, c.book_id, c.user_id, c.parent_comment_id, c.comment_text, c.created_at 
+            FROM comments c 
+            JOIN comment_tree ct ON c.parent_comment_id = ct.id
+        ) 
+        SELECT comment_tree.*, users.username 
+        FROM comment_tree 
+        JOIN users ON comment_tree.user_id = users.id 
+        ORDER BY created_at ASC;
+    """, (book_id,))
+    comments = cursor.fetchall()
+
+    print(f"DEBUG: Fetched {len(comments)} comments")  # Debugging
+
+    cursor.close()
+    conn.close()
+
+    return render_template('book_detail.html', book=book, comments=comments, avg_rating=avg_rating, total_ratings=total_ratings, username=session.get('username'))
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -59,8 +185,7 @@ def register():
     
     return render_template('register.html')
 
-@app.route('/book/<int:book_id>', methods=['GET', 'POST'])
-def book_detail(book_id):
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -69,26 +194,18 @@ def book_detail(book_id):
     book = cursor.fetchone()
 
     if not book:
-        return "Book not found", 404  # Handle invalid book IDs
+        return "Book not found", 404
 
-    # Handle comment submission
-    if request.method == 'POST':
-        if 'user_id' not in session:
-            flash("You need to log in to comment.")
-            return redirect(url_for('login'))
+    # Fetch average rating
+    cursor.execute("""
+        SELECT ROUND(AVG(rating), 1) AS avg_rating, COUNT(rating) AS total_ratings
+        FROM ratings WHERE book_id = %s
+    """, (book_id,))
+    rating_data = cursor.fetchone()
+    avg_rating = rating_data['avg_rating'] if rating_data['avg_rating'] is not None else "No ratings yet"
+    total_ratings = rating_data['total_ratings']
 
-        comment_text = request.form['comment']
-        parent_comment_id = request.form.get('parent_comment_id', None)  # Check if it's a reply
-
-        cursor.execute(
-            "INSERT INTO comments (book_id, user_id, parent_comment_id, comment_text) VALUES (%s, %s, %s, %s)",
-            (book_id, session['user_id'], parent_comment_id, comment_text)
-        )
-        conn.commit()
-        flash("Comment added successfully!")
-        return redirect(url_for('book_detail', book_id=book_id))  # Reload page after posting comment
-
-    # Fetch comments (including replies)
+    # Fetch comments (same as before)
     cursor.execute("""
         WITH RECURSIVE comment_tree AS (
             SELECT id, book_id, user_id, parent_comment_id, comment_text, created_at 
@@ -109,7 +226,7 @@ def book_detail(book_id):
     cursor.close()
     conn.close()
 
-    return render_template('book_detail.html', book=book, comments=comments, username=session.get('username'))
+    return render_template('book_detail.html', book=book, comments=comments, avg_rating=avg_rating, total_ratings=total_ratings, username=session.get('username'))
 
 
 @app.route('/cart')
@@ -397,6 +514,37 @@ def delete_user(user_id):
     
     flash("User deleted successfully.")
     return redirect(url_for('admin_dashboard'))
+
+
+
+@app.route('/rate_book/<int:book_id>', methods=['POST'])
+def rate_book(book_id):
+    if 'user_id' not in session:
+        flash("You need to log in to rate books.")
+        return redirect(url_for('login'))
+
+    rating = int(request.form['rating'])  # Get rating from form input
+
+    if rating < 1 or rating > 5:
+        flash("Invalid rating. Please choose between 1 and 5 stars.")
+        return redirect(url_for('book_detail', book_id=book_id))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Insert or update rating (ensures one rating per user per book)
+    cursor.execute("""
+        INSERT INTO ratings (book_id, user_id, rating) 
+        VALUES (%s, %s, %s) 
+        ON DUPLICATE KEY UPDATE rating = VALUES(rating)
+    """, (book_id, session['user_id'], rating))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("Your rating has been submitted!")
+    return redirect(url_for('book_detail', book_id=book_id))
 
 
 @app.route('/logout')

@@ -16,6 +16,17 @@
             display: flex;
             gap: 15px;
         }
+        .book-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .book-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            width: 200px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -33,7 +44,7 @@
             {% endif %}
 
             {% if session.get('is_admin') %}
-            <a href="{{ url_for('admin_dashboard') }}">Admin Panel</a>
+                <a href="{{ url_for('admin_dashboard') }}">Admin Panel</a>
             {% endif %}
         </nav>
     </header>
@@ -52,11 +63,18 @@
                 </a>
                 <p><strong>Author:</strong> {{ book.author }}</p>
                 <p><strong>Price:</strong> ${{ book.price }}</p>
+                <p><strong>Rating:</strong> 
+                    {% if book.avg_rating %}
+                        {{ book.avg_rating }} ★ ({{ book.total_ratings }} ratings)
+                    {% else %}
+                        ★
+                    {% endif %}
+                </p>
+                
                 <a href="{{ url_for('add_to_cart', book_id=book.id) }}" class="button">Add to Cart</a>
             </div>
             {% endfor %}
         </section>
-        
     </main>
 </body>
 </html>

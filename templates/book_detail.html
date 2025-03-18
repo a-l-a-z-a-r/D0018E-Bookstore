@@ -5,8 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ book.title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .book-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .book-info {
+            max-width: 500px;
+        }
+        .comments-section {
+            margin-top: 30px;
+        }
+        .comment {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .comment small {
+            display: block;
+            color: gray;
+            margin-top: 5px;
+        }
+        .reply {
+            margin-left: 30px;
+        }
+        form {
+            margin-top: 15px;
+        }
+    </style>
 </head>
 <body>
+
     <header>
         <h1>{{ book.title }}</h1>
         <nav>
@@ -14,39 +50,75 @@
             <a href="{{ url_for('cart') }}">Cart</a>
         </nav>
     </header>
-    <main>
+
+    <main class="book-container">
+        <!-- Book Image -->
         <img src="{{ url_for('static', filename='images/' ~ book.image) }}" alt="{{ book.title }}" style="max-width: 300px;">
-        <p><strong>Author:</strong> {{ book.author }}</p>
-        <p><strong>Price:</strong> ${{ book.price }}</p>
-        <p><strong>Description:</strong> {{ book.description }}</p>
 
-        <p>
-            <a href="{{ url_for('add_to_cart', book_id=book.id) }}" class="button">Add to Cart</a>
-        </p>
+        <!-- Book Details -->
+        <div class="book-info">
+            <p><strong>Author:</strong> {{ book.author }}</p>
+            <p><strong>Price:</strong> ${{ book.price }}</p>
+            <p><strong>Description:</strong> {{ book.description }}</p>
 
-        <!-- Comment Section -->
+            <!-- Rating Section -->
+            <h3>Rating</h3>
+            <p><strong>Average Rating:</strong> 
+                {% if avg_rating %}
+                    {{ avg_rating }} ★ ({{ total_ratings }} ratings)
+                {% else %}
+                    ★
+                {% endif %}
+            </p>
+
+            {% if username %}
+            <form method="POST" action="{{ url_for('rate_book', book_id=book.id) }}">
+                <label for="rating">Rate this book (1-5 stars):</label>
+                <select name="rating" id="rating">
+                    <option value="1">1 ★</option>
+                    <option value="2">2 ★</option>
+                    <option value="3">3 ★</option>
+                    <option value="4">4 ★</option>
+                    <option value="5">5 ★</option>
+                </select>
+                <button type="submit">Submit Rating</button>
+            </form>
+            {% else %}
+            <p><a href="{{ url_for('login') }}">Login</a> to rate this book.</p>
+            {% endif %}
+
+            <p>
+                <a href="{{ url_for('add_to_cart', book_id=book.id) }}" class="button">Add to Cart</a>
+            </p>
+        </div>
+    </main>
+
+    <!-- Comments Section -->
+    <section class="comments-section">
         <h2>Comments</h2>
         {% if comments %}
             {% for comment in comments %}
-                <div class="comment" style="margin-left: {{ (comment.parent_comment_id or 0) * 20 }}px;">
+                <div class="comment" style="margin-left: {{ (comment.parent_comment_id or 0) * 30 }}px;">
                     <strong>{{ comment.username }}</strong>: {{ comment.comment_text }}
                     <small>{{ comment.created_at }}</small>
 
-                    <!-- Reply Form -->
-                    <form method="POST" action="{{ url_for('book_detail', book_id=book.id) }}">
-                        <input type="hidden" name="parent_comment_id" value="{{ comment.id }}">
-                        <input type="text" name="comment" placeholder="Reply to this comment..." required>
-                        <button type="submit">Reply</button>
-                    </form>
+                    <!-- Reply Form (Only for Logged-In Users) -->
+                    {% if username %}
+                        <form method="POST" action="{{ url_for('book_detail', book_id=book.id) }}">
+                            <input type="hidden" name="parent_comment_id" value="{{ comment.id }}">
+                            <input type="text" name="comment" placeholder="Reply to this comment..." required>
+                            <button type="submit">Reply</button>
+                        </form>
+                    {% endif %}
                 </div>
             {% endfor %}
         {% else %}
             <p>No comments yet. Be the first to comment!</p>
         {% endif %}
 
-        <!-- Add New Comment -->
-        <h3>Add a Comment</h3>
+        <!-- Add New Comment (Only for Logged-In Users) -->
         {% if username %}
+            <h3>Add a Comment</h3>
             <form method="POST" action="{{ url_for('book_detail', book_id=book.id) }}">
                 <textarea name="comment" placeholder="Write your comment here..." required></textarea>
                 <button type="submit">Submit</button>
@@ -54,6 +126,7 @@
         {% else %}
             <p><a href="{{ url_for('login') }}">Login</a> to add a comment.</p>
         {% endif %}
-    </main>
+    </section>
+
 </body>
 </html>
